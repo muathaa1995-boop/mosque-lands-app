@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة تحكم — أراضي المساجد</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --stone:#ECE3D0; --stone-deep:#DED2B6; --panel:#F6F1E5; --ink:#1E2C24;
+    --juniper:#2F4A3E; --juniper-light:#3F5F50; --brass:#A9803F; --line:#D8CBA9;
+    --olive:#5C7A52; --teal:#3C6E64; --muted:#7C7565; --danger:#A94A3F;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--stone-deep); font-family:'Tajawal', sans-serif; color:var(--ink); min-height:100vh; }
+
+  /* ---- login ---- */
+  #loginView{ min-height:100vh; display:flex; align-items:center; justify-content:center; }
+  .login-box{ background:#fff; border:1px solid var(--line); padding:36px 32px; width:320px; }
+  .login-box h1{ font-family:'Cairo',sans-serif; font-size:18px; color:var(--juniper); margin:0 0 4px; text-align:center; }
+  .login-box .sub{ font-size:12px; color:var(--muted); text-align:center; margin-bottom:22px; }
+  .field{ margin-bottom:14px; }
+  .field label{ font-size:12px; color:var(--muted); display:block; margin-bottom:5px; }
+  .field input, .field select, .field textarea{
+    width:100%; padding:10px 12px; border:1px solid var(--line); font-family:'Tajawal',sans-serif; font-size:13px; background:#fff; color:var(--ink);
+  }
+  .btn{ background:var(--brass); color:#fff; font-family:'Cairo',sans-serif; font-weight:700; font-size:13px;
+    padding:10px 20px; border:none; cursor:pointer; }
+  .btn.block{ width:100%; padding:12px; }
+  .btn.ghost{ background:transparent; color:var(--juniper); border:1px solid var(--juniper); }
+  .btn.danger{ background:var(--danger); }
+  .error{ color:var(--danger); font-size:12px; margin-top:10px; text-align:center; display:none; }
+
+  /* ---- dashboard frame ---- */
+  #dashView{ display:none; }
+  .frame{ display:flex; min-height:100vh; }
+  .side{ width:220px; background:var(--juniper); color:#fff; padding:24px 18px; display:flex; flex-direction:column; }
+  .side .brand{ font-family:'Cairo',sans-serif; font-weight:800; font-size:15px; }
+  .side .brand-sub{ font-size:11px; opacity:0.7; margin-bottom:30px; }
+  .nav-item{ padding:10px 12px; border-radius:6px; font-size:13px; margin-bottom:4px; color:rgba(255,255,255,0.9); }
+  .side .spacer{ flex:1; }
+  .side .user{ font-size:11px; opacity:0.7; border-top:1px solid rgba(255,255,255,0.15); padding-top:14px; margin-bottom:10px; }
+
+  .main{ flex:1; padding:26px 30px; }
+  .topbar{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:22px; }
+  .topbar h1{ font-family:'Cairo',sans-serif; font-size:19px; margin:0 0 4px; color:var(--juniper); }
+  .topbar .sub{ font-size:12px; color:var(--muted); }
+
+  .kpi-row{ display:flex; gap:14px; margin-bottom:24px; }
+  .kpi{ flex:1; background:#fff; border:1px solid var(--line); padding:14px 16px; }
+  .kpi .num{ font-family:'Cairo',sans-serif; font-weight:800; font-size:20px; color:var(--juniper); }
+  .kpi .lab{ font-size:11.5px; color:var(--muted); margin-top:2px; }
+  .kpi.brass .num{ color:var(--brass); } .kpi.teal .num{ color:var(--teal); }
+
+  table{ width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); font-size:13px; }
+  thead th{ text-align:right; font-family:'Cairo',sans-serif; font-weight:700; font-size:11.5px; color:var(--muted);
+    padding:12px 14px; border-bottom:1px solid var(--line); }
+  tbody td{ padding:13px 14px; border-bottom:1px solid var(--line); }
+  tbody tr:last-child td{ border-bottom:none; }
+  .pill{ display:inline-block; font-size:11px; font-weight:700; font-family:'Cairo',sans-serif; padding:3px 11px; border-radius:12px; }
+  .pill.vacant{ background:rgba(92,122,82,0.14); color:var(--olive); }
+  .pill.in_progress{ background:rgba(169,128,63,0.14); color:var(--brass); }
+  .pill.funded{ background:rgba(60,110,100,0.14); color:var(--teal); }
+  .row-actions{ color:var(--brass); font-size:12px; font-weight:700; cursor:pointer; }
+  .row-actions + .row-actions{ margin-right:12px; }
+  .row-actions.danger{ color:var(--danger); }
+
+  /* ---- modal ---- */
+  .overlay{ position:fixed; inset:0; background:rgba(30,44,36,0.45); display:none; align-items:flex-start;
+    justify-content:center; padding:40px 20px; overflow-y:auto; z-index:50; }
+  .modal{ background:#fff; width:100%; max-width:560px; padding:28px; }
+  .modal h2{ font-family:'Cairo',sans-serif; font-size:16px; color:var(--juniper); margin:0 0 18px; }
+  .two-col{ display:flex; gap:12px; }
+  .two-col .field{ flex:1; }
+  .fac-item{ display:flex; gap:8px; margin-bottom:8px; align-items:center; }
+  .fac-item select, .fac-item input{ font-size:12px; padding:8px; }
+  .fac-item .rm{ color:var(--danger); font-size:12px; cursor:pointer; flex:0 0 auto; }
+  .add-fac{ font-size:12px; color:var(--brass); cursor:pointer; font-weight:700; margin-bottom:16px; display:inline-block; }
+  .modal-actions{ display:flex; gap:10px; margin-top:20px; }
+</style>
+</head>
+<body>
+
+<!-- ==== LOGIN ==== -->
+<div id="loginView">
+  <div class="login-box">
+    <h1>لوحة التحكم</h1>
+    <div class="sub">أراضي المساجد</div>
+    <div class="field"><label>البريد الإلكتروني</label><input id="loginEmail" type="email"></div>
+    <div class="field"><label>كلمة المرور</label><input id="loginPass" type="password"></div>
+    <button class="btn block" onclick="login()">دخول</button>
+    <div class="error" id="loginError">بيانات الدخول غير صحيحة</div>
+  </div>
+</div>
+
+<!-- ==== DASHBOARD ==== -->
+<div id="dashView">
+  <div class="frame">
+    <div class="side">
+      <div class="brand">أراضي المساجد</div>
+      <div class="brand-sub">لوحة التحكم</div>
+      <div class="nav-item">🗂 الأراضي</div>
+      <div class="spacer"></div>
+      <div class="user" id="userEmail"></div>
+      <button class="btn ghost" onclick="logout()">تسجيل الخروج</button>
+    </div>
+
+    <div class="main">
+      <div class="topbar">
+        <div><h1>إدارة الأراضي</h1><div class="sub">إضافة وتعديل بيانات الأراضي المخصصة للمساجد</div></div>
+        <button class="btn" onclick="openForm()">+ إضافة أرض جديدة</button>
+      </div>
+
+      <div class="kpi-row" id="kpiRow"></div>
+
+      <table>
+        <thead>
+          <tr><th>اسم الأرض</th><th>المدينة</th><th>المساحة</th><th>الحالة</th><th></th></tr>
+        </thead>
+        <tbody id="landsBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ==== FORM MODAL ==== -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="formTitle">إضافة أرض جديدة</h2>
+    <input type="hidden" id="f-id">
+
+    <div class="field"><label>عنوان الأرض</label><input id="f-title" type="text"></div>
+    <div class="two-col">
+      <div class="field"><label>المدينة</label><input id="f-city" type="text"></div>
+      <div class="field"><label>الحي</label><input id="f-district" type="text"></div>
+    </div>
+    <div class="two-col">
+      <div class="field"><label>المساحة (م²)</label><input id="f-area" type="number"></div>
+      <div class="field">
+        <label>الحالة</label>
+        <select id="f-status">
+          <option value="vacant">فاضية</option>
+          <option value="in_progress">تحت الإنشاء</option>
+          <option value="funded">مكتملة التمويل</option>
+        </select>
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="field"><label>التكلفة التقديرية</label><input id="f-cost" type="number"></div>
+      <div class="field"><label>التواصل (بريد أو جوال)</label><input id="f-contact" type="text"></div>
+    </div>
+    <div class="two-col">
+      <div class="field"><label>خط العرض (lat)</label><input id="f-lat" type="number" step="any"></div>
+      <div class="field"><label>خط الطول (lng)</label><input id="f-lng" type="number" step="any"></div>
+    </div>
+    <div class="field"><label>الوصف</label><textarea id="f-desc" rows="3"></textarea></div>
+
+    <div class="field">
+      <label>المرافق المجاورة</label>
+      <div id="facList"></div>
+      <span class="add-fac" onclick="addFacRow()">+ إضافة مرفق</span>
+    </div>
+
+    <div class="field"><label>صور الأرض (روابط، رابط لكل سطر)</label><textarea id="f-images" rows="2" placeholder="https://..."></textarea></div>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="saveLand()">حفظ</button>
+      <button class="btn ghost" onclick="closeForm()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================
+// إعدادات الاتصال بـ Supabase — عدّل القيمتين التاليتين (نفس القيم في index.html)
+// ============================================
+const SUPABASE_URL = "https://fnfibwhmmhvnwkgebbmt.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZuZmlid2htbWh2bndrZ2ViYm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNTcxNjQsImV4cCI6MjEwNDYzMzE2NH0.2PqjHBMng-um1tQY85xHeMnjYnhJfyq4nk4g1lHCfm4";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const STATUS_LABEL = { vacant: "فاضية", in_progress: "تحت الإنشاء", funded: "مكتملة التمويل" };
+const FACILITY_TYPES = {
+  housing: "سكن", school: "مدرسة", main_road: "طريق رئيسي",
+  hospital: "مستشفى", other_mosque: "مسجد آخر", market: "سوق", other: "أخرى"
+};
+
+let currentLands = [];
+
+// ---------- AUTH ----------
+async function checkSession(){
+  const { data } = await db.auth.getSession();
+  if(data.session){ enterDashboard(data.session.user.email); }
+}
+async function login(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
+  if(error){ document.getElementById('loginError').style.display = 'block'; return; }
+  enterDashboard(data.user.email);
+}
+async function logout(){
+  await db.auth.signOut();
+  document.getElementById('dashView').style.display = 'none';
+  document.getElementById('loginView').style.display = 'flex';
+}
+function enterDashboard(email){
+  document.getElementById('loginView').style.display = 'none';
+  document.getElementById('dashView').style.display = 'block';
+  document.getElementById('userEmail').textContent = 'مسجل الدخول: ' + email;
+  loadLands();
+}
+
+// ---------- LOAD & RENDER ----------
+async function loadLands(){
+  const { data, error } = await db.from('lands').select('*').order('created_at', { ascending:false });
+  if(error) return;
+  currentLands = data || [];
+  renderKpis();
+  renderTable();
+}
+function renderKpis(){
+  const counts = { vacant:0, in_progress:0, funded:0 };
+  currentLands.forEach(l => { if(counts[l.status] !== undefined) counts[l.status]++; });
+  document.getElementById('kpiRow').innerHTML = `
+    <div class="kpi"><div class="num">${currentLands.length}</div><div class="lab">إجمالي الأراضي</div></div>
+    <div class="kpi"><div class="num">${counts.vacant}</div><div class="lab">فاضية</div></div>
+    <div class="kpi brass"><div class="num">${counts.in_progress}</div><div class="lab">تحت الإنشاء</div></div>
+    <div class="kpi teal"><div class="num">${counts.funded}</div><div class="lab">مكتملة التمويل</div></div>
+  `;
+}
+function renderTable(){
+  document.getElementById('landsBody').innerHTML = currentLands.map(l => `
+    <tr>
+      <td>${l.title}</td>
+      <td>${l.city}</td>
+      <td>${l.area_sqm ? l.area_sqm + ' م²' : '—'}</td>
+      <td><span class="pill ${l.status}">${STATUS_LABEL[l.status]}</span></td>
+      <td>
+        <span class="row-actions" onclick="openForm('${l.id}')">تعديل</span>
+        <span class="row-actions danger" onclick="deleteLand('${l.id}')">حذف</span>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ---------- FORM ----------
+let facRowCount = 0;
+function addFacRow(type='housing', name='', dist=''){
+  facRowCount++;
+  const id = 'fac' + facRowCount;
+  const wrap = document.createElement('div');
+  wrap.className = 'fac-item';
+  wrap.id = id;
+  wrap.innerHTML = `
+    <select class="fac-type" style="flex:0 0 110px;">
+      ${Object.entries(FACILITY_TYPES).map(([k,v]) => `<option value="${k}" ${k===type?'selected':''}>${v}</option>`).join('')}
+    </select>
+    <input class="fac-name" type="text" placeholder="اسم المرفق" value="${name}" style="flex:1;">
+    <input class="fac-dist" type="number" placeholder="المسافة (م)" value="${dist}" style="flex:0 0 100px;">
+    <span class="rm" onclick="document.getElementById('${id}').remove()">حذف</span>
+  `;
+  document.getElementById('facList').appendChild(wrap);
+}
+
+async function openForm(id){
+  document.getElementById('overlay').style.display = 'flex';
+  document.getElementById('facList').innerHTML = '';
+  facRowCount = 0;
+
+  if(id){
+    const land = currentLands.find(l => l.id === id);
+    document.getElementById('formTitle').textContent = 'تعديل الأرض';
+    document.getElementById('f-id').value = land.id;
+    document.getElementById('f-title').value = land.title || '';
+    document.getElementById('f-city').value = land.city || '';
+    document.getElementById('f-district').value = land.district || '';
+    document.getElementById('f-area').value = land.area_sqm || '';
+    document.getElementById('f-status').value = land.status || 'vacant';
+    document.getElementById('f-cost').value = land.estimated_cost || '';
+    document.getElementById('f-contact').value = land.contact_info || '';
+    document.getElementById('f-lat').value = land.coordinates_lat || '';
+    document.getElementById('f-lng').value = land.coordinates_lng || '';
+    document.getElementById('f-desc').value = land.description || '';
+
+    const { data: facilities } = await db.from('nearby_facilities').select('*').eq('land_id', id);
+    (facilities || []).forEach(f => addFacRow(f.facility_type, f.name || '', f.distance_meters || ''));
+
+    const { data: images } = await db.from('land_images').select('*').eq('land_id', id).order('sort_order');
+    document.getElementById('f-images').value = (images || []).map(i => i.image_url).join('\n');
+  } else {
+    document.getElementById('formTitle').textContent = 'إضافة أرض جديدة';
+    ['f-id','f-title','f-city','f-district','f-area','f-cost','f-contact','f-lat','f-lng','f-desc','f-images']
+      .forEach(id => document.getElementById(id).value = '');
+    document.getElementById('f-status').value = 'vacant';
+  }
+}
+function closeForm(){ document.getElementById('overlay').style.display = 'none'; }
+
+async function saveLand(){
+  const id = document.getElementById('f-id').value;
+  const payload = {
+    title: document.getElementById('f-title').value.trim(),
+    city: document.getElementById('f-city').value.trim(),
+    district: document.getElementById('f-district').value.trim() || null,
+    area_sqm: document.getElementById('f-area').value || null,
+    status: document.getElementById('f-status').value,
+    estimated_cost: document.getElementById('f-cost').value || null,
+    contact_info: document.getElementById('f-contact').value.trim() || null,
+    coordinates_lat: document.getElementById('f-lat').value || null,
+    coordinates_lng: document.getElementById('f-lng').value || null,
+    description: document.getElementById('f-desc').value.trim() || null,
+  };
+  if(!payload.title || !payload.city){ alert('عنوان الأرض والمدينة مطلوبان'); return; }
+
+  let landId = id;
+  if(id){
+    const { error } = await db.from('lands').update(payload).eq('id', id);
+    if(error){ alert('حدث خطأ أثناء الحفظ'); return; }
+  } else {
+    const { data, error } = await db.from('lands').insert(payload).select().single();
+    if(error){ alert('حدث خطأ أثناء الحفظ'); return; }
+    landId = data.id;
+  }
+
+  // إعادة كتابة المرافق المجاورة
+  await db.from('nearby_facilities').delete().eq('land_id', landId);
+  const facRows = document.querySelectorAll('#facList .fac-item');
+  const facPayload = Array.from(facRows).map(row => ({
+    land_id: landId,
+    facility_type: row.querySelector('.fac-type').value,
+    name: row.querySelector('.fac-name').value.trim() || null,
+    distance_meters: row.querySelector('.fac-dist').value || null,
+  }));
+  if(facPayload.length) await db.from('nearby_facilities').insert(facPayload);
+
+  // إعادة كتابة الصور (روابط مباشرة، سطر لكل رابط)
+  await db.from('land_images').delete().eq('land_id', landId);
+  const imgUrls = document.getElementById('f-images').value.split('\n').map(s => s.trim()).filter(Boolean);
+  if(imgUrls.length){
+    const imgPayload = imgUrls.map((url, i) => ({ land_id: landId, image_url: url, sort_order: i }));
+    await db.from('land_images').insert(imgPayload);
+  }
+
+  closeForm();
+  loadLands();
+}
+
+async function deleteLand(id){
+  if(!confirm('هل تريد حذف هذه الأرض؟ سيتم حذف صورها ومرافقها المرتبطة أيضًا.')) return;
+  const { error } = await db.from('lands').delete().eq('id', id);
+  if(error){ alert('تعذّر الحذف'); return; }
+  loadLands();
+}
+
+checkSession();
+</script>
+</body>
+</html>
