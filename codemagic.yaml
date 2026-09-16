@@ -19,6 +19,3 @@ workflows:
             -scheme "$XCODE_SCHEME" \
             -sdk iphonesimulator \
             CODE_SIGNING_ALLOWED=NO
-    publishing:
-      email:
-        recipients: []
