@@ -32,7 +32,7 @@
   #app{ max-width:520px; margin:0 auto; min-height:100%; background:var(--stone); }
 
   /* ---- top bar ---- */
-  .bar{ padding:22px 20px 14px; }
+ .bar{ padding:calc(22px + env(safe-area-inset-top)) 20px 14px; }
   .bar .eyebrow{ font-size:12px; color:var(--brass); font-weight:700; font-family:'Cairo', sans-serif; }
   .bar h1{ font-family:'Cairo', sans-serif; font-size:19px; font-weight:800; margin:2px 0 0; color:var(--juniper); }
 
