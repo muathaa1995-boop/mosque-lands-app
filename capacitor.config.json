@@ -1,5 +1,8 @@
 {
-   "appId": "com.muath.mosquelands",
+  "appId": "com.muath.mosquelands",
   "appName": "أراضي المساجد",
-  ""webDir": "www","
+  "webDir": "www",
+  "ios": {
+    "contentInset": "automatic"
+  }
 }
