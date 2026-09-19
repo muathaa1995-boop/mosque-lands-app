@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>أراضي المساجد</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --stone:#ECE3D0;
+    --stone-deep:#DED2B6;
+    --ink:#1E2C24;
+    --juniper:#2F4A3E;
+    --juniper-light:#3F5F50;
+    --brass:#A9803F;
+    --brass-light:#C7A05D;
+    --line:#C7B695;
+    --olive:#5C7A52;
+    --teal:#3C6E64;
+    --muted:#7C7565;
+  }
+  *{box-sizing:border-box;}
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background:var(--stone);
+    font-family:'Tajawal', sans-serif;
+    color:var(--ink);
+  }
+  #app{ max-width:520px; margin:0 auto; min-height:100%; background:var(--stone); }
+
+  /* ---- top bar ---- */
+ .bar{ padding:calc(22px + env(safe-area-inset-top)) 20px 14px; }
+  .bar .eyebrow{ font-size:12px; color:var(--brass); font-weight:700; font-family:'Cairo', sans-serif; }
+  .bar h1{ font-family:'Cairo', sans-serif; font-size:19px; font-weight:800; margin:2px 0 0; color:var(--juniper); }
+
+  .filters{ display:flex; gap:8px; padding:4px 20px 14px; overflow-x:auto; }
+  .chip{ flex:0 0 auto; font-size:12px; padding:6px 14px; border-radius:20px; border:1px solid var(--line);
+    color:var(--juniper); background:transparent; cursor:pointer; font-family:'Tajawal',sans-serif; }
+  .chip.active{ background:var(--juniper); color:var(--stone); border-color:var(--juniper); }
+
+  .list{ padding:0 20px 40px; display:flex; flex-direction:column; gap:16px; }
+  .empty{ text-align:center; color:var(--muted); font-size:13px; padding:40px 20px; }
+
+  .card{ background:#fff; border:1px solid var(--line); overflow:hidden; cursor:pointer; }
+  .card .arch{ height:96px; border-radius:0 0 60px 60px / 0 0 40px 40px; position:relative; }
+  .card .arch.vacant{ background:linear-gradient(135deg, var(--juniper), var(--juniper-light)); }
+  .card .arch.in_progress{ background:linear-gradient(135deg,var(--brass),var(--brass-light)); }
+  .card .arch.funded{ background:linear-gradient(135deg,var(--teal),#5A9184); }
+  .card .arch .status{ position:absolute; top:10px; right:12px; font-size:10px; font-family:'Cairo', sans-serif;
+    font-weight:700; padding:3px 10px; border-radius:12px; background:rgba(255,255,255,0.92); }
+  .status-text.vacant{ color:var(--olive); } .status-text.in_progress{ color:var(--brass); } .status-text.funded{ color:var(--teal); }
+  .card .body{ padding:12px 14px 14px; }
+  .card .body h3{ font-family:'Cairo', sans-serif; font-size:15px; margin:0 0 4px; }
+  .card .meta{ font-size:12px; color:var(--muted); display:flex; gap:10px; margin-bottom:10px; }
+  .card .foot{ display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--line); padding-top:8px; }
+  .card .cost{ font-family:'Cairo', sans-serif; font-size:12px; font-weight:700; color:var(--juniper); }
+  .card .go{ font-size:11px; color:var(--brass); font-weight:700; }
+
+  /* ---- detail ---- */
+  #detail{ display:none; }
+  .hero{ height:190px; background:linear-gradient(160deg, var(--juniper) 0%, var(--juniper-light) 55%, var(--brass) 140%);
+    border-radius:0 0 90px 90px / 0 0 46px 46px; position:relative; }
+.hero .back{ position:absolute; top:calc(16px + env(safe-area-inset-top)); right:18px; width:32px; height:32px; border-radius:50%; background:rgba(255,255,255,0.9);
+  display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--juniper); cursor:pointer; border:none; }
+  .hero .htitle{ position:absolute; bottom:18px; right:20px; left:20px; color:#fff; }
+  .hero .htitle .eyebrow{ font-size:11px; opacity:0.85; font-weight:600; }
+  .hero .htitle h2{ font-family:'Cairo', sans-serif; font-size:19px; margin:2px 0 0; }
+
+  .stat-row{ display:flex; padding:16px 20px 8px; gap:10px; }
+  .stat{ flex:1; text-align:center; padding:10px 6px; border:1px solid var(--line); background:#fff; }
+  .stat .num{ font-family:'Cairo', sans-serif; font-weight:800; color:var(--juniper); font-size:14px; }
+  .stat .lab{ font-size:10px; color:var(--muted); margin-top:2px; }
+
+  .section{ padding:16px 20px 4px; }
+  .section h4{ font-family:'Cairo', sans-serif; font-size:13px; color:var(--juniper); margin:0 0 10px; display:flex; align-items:center; gap:8px; }
+  .section h4::after{ content:''; flex:1; height:1px; background:var(--line); }
+  .desc{ font-size:13px; line-height:1.9; color:#3A3A34; margin:0 0 4px; }
+
+  .imgs{ display:flex; gap:8px; overflow-x:auto; padding:16px 20px 0; }
+  .imgs img{ width:140px; height:100px; object-fit:cover; border:1px solid var(--line); flex:0 0 auto; }
+
+  .fac-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); font-size:12.5px; }
+  .fac-row:last-child{ border-bottom:none; }
+  .fac-icon{ width:26px; height:26px; border-radius:50%; background:var(--stone-deep); color:var(--juniper);
+    display:flex; align-items:center; justify-content:center; font-size:13px; flex:0 0 auto; }
+  .fac-name{ flex:1; color:var(--ink); font-weight:500; }
+  .fac-dist{ color:var(--muted); font-size:11px; }
+
+  .cta{ display:block; margin:18px 20px 30px; background:var(--brass); color:#fff; text-align:center; padding:14px;
+    font-family:'Cairo', sans-serif; font-weight:700; font-size:14px; text-decoration:none; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ==== LIST VIEW ==== -->
+  <div id="listView">
+    <div class="bar">
+      <span class="eyebrow">أراضي المساجد</span>
+      <h1>أراضي متاحة للتبرع</h1>
+    </div>
+    <div class="filters" id="filters">
+      <button class="chip active" data-city="all">الكل</button>
+    </div>
+    <div class="list" id="list">
+      <div class="empty">جارِ تحميل الأراضي...</div>
+    </div>
+  </div>
+
+  <!-- ==== DETAIL VIEW ==== -->
+  <div id="detail">
+    <div class="hero">
+      <button class="back" onclick="showList()">›</button>
+      <div class="htitle">
+        <div class="eyebrow" id="d-location"></div>
+        <h2 id="d-title"></h2>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="num" id="d-area"></div><div class="lab">المساحة</div></div>
+      <div class="stat"><div class="num" id="d-status"></div><div class="lab">الحالة</div></div>
+      <div class="stat"><div class="num" id="d-cost"></div><div class="lab">التكلفة التقديرية</div></div>
+    </div>
+
+    <div class="imgs" id="d-images"></div>
+
+    <div class="section">
+      <h4>عن الأرض</h4>
+      <p class="desc" id="d-desc"></p>
+    </div>
+
+    <div class="section" id="d-fac-section" style="display:none;">
+      <h4>المرافق المجاورة</h4>
+      <div id="d-facilities"></div>
+    </div>
+
+    <a class="cta" id="d-contact" href="#">التواصل للتبرع بهذه الأرض</a>
+  </div>
+
+</div>
+
+<script>
+const SUPABASE_URL = "https://fnfibwhmmhvnwkgebbmt.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZuZmlid2htbWh2bndrZ2ViYm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNTcxNjQsImV4cCI6MjEwNDYzMzE2NH0.2PqjHBMng-um1tQY85xHeMnjYnhJfyq4nk4g1lHCfm4";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const STATUS_LABEL = { vacant: "فاضية", in_progress: "تحت الإنشاء", funded: "مكتملة التمويل" };
+const FACILITY_ICON = {
+  housing: "⌂", school: "📖", main_road: "🛣", hospital: "🏥",
+  other_mosque: "🕌", market: "🛍", other: "•"
+};
+
+let allLands = [];
+let activeCity = "all";
+
+async function loadLands(){
+  const { data, error } = await db.from('lands').select('*').order('created_at', { ascending:false });
+  if(error){ document.getElementById('list').innerHTML = `<div class="empty">تعذّر تحميل البيانات</div>`; return; }
+  allLands = data || [];
+  buildFilters();
+  renderList();
+}
+
+function buildFilters(){
+  const cities = [...new Set(allLands.map(l => l.city))];
+  const wrap = document.getElementById('filters');
+  wrap.innerHTML = `<button class="chip active" data-city="all" onclick="setCity('all')">الكل</button>` +
+    cities.map(c => `<button class="chip" data-city="${c}" onclick="setCity('${c}')">${c}</button>`).join('');
+}
+
+function setCity(city){
+  activeCity = city;
+  document.querySelectorAll('.chip').forEach(el => el.classList.toggle('active', el.dataset.city === city));
+  renderList();
+}
+
+function renderList(){
+  const list = document.getElementById('list');
+  const items = activeCity === 'all' ? allLands : allLands.filter(l => l.city === activeCity);
+  if(items.length === 0){ list.innerHTML = `<div class="empty">لا توجد أراضٍ حاليًا</div>`; return; }
+
+  list.innerHTML = items.map(l => `
+    <div class="card" onclick="openDetail('${l.id}')">
+      <div class="arch ${l.status}"><span class="status status-text-${l.status}"><span class="status-text ${l.status}">${STATUS_LABEL[l.status] || l.status}</span></span></div>
+      <div class="body">
+        <h3>${l.title}</h3>
+        <div class="meta"><span>${l.city}</span>${l.area_sqm ? `<span>${l.area_sqm} م²</span>` : ''}</div>
+        <div class="foot">
+          <span class="cost">${l.status === 'funded' ? 'تم التمويل بالكامل' : (l.estimated_cost ? 'التكلفة التقديرية ' + Number(l.estimated_cost).toLocaleString('ar') + ' ر.س' : '')}</span>
+          <span class="go">التفاصيل ‹</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function openDetail(id){
+  const land = allLands.find(l => l.id === id);
+  if(!land) return;
+
+  document.getElementById('d-location').textContent = `${land.city}${land.district ? ' — ' + land.district : ''}`;
+  document.getElementById('d-title').textContent = land.title;
+  document.getElementById('d-area').textContent = land.area_sqm ? land.area_sqm + ' م²' : '—';
+  document.getElementById('d-status').textContent = STATUS_LABEL[land.status] || land.status;
+  document.getElementById('d-cost').textContent = land.estimated_cost ? Number(land.estimated_cost).toLocaleString('ar') + ' ر.س' : '—';
+  document.getElementById('d-desc').textContent = land.description || 'لا يوجد وصف بعد.';
+
+  const contactEl = document.getElementById('d-contact');
+  if(land.contact_info){
+    contactEl.style.display = 'block';
+    contactEl.textContent = 'التواصل للتبرع بهذه الأرض';
+    contactEl.href = land.contact_info.includes('@') ? `mailto:${land.contact_info}` :
+                      (/^\+?\d+$/.test(land.contact_info) ? `tel:${land.contact_info}` : '#');
+  } else {
+    contactEl.style.display = 'none';
+  }
+
+  const { data: images } = await db.from('land_images').select('*').eq('land_id', id).order('sort_order');
+  const imgWrap = document.getElementById('d-images');
+  imgWrap.innerHTML = (images || []).map(img => `<img src="${img.image_url}" alt="${img.caption || ''}">`).join('');
+
+  const { data: facilities } = await db.from('nearby_facilities').select('*').eq('land_id', id);
+  const facSection = document.getElementById('d-fac-section');
+  const facWrap = document.getElementById('d-facilities');
+  if(facilities && facilities.length){
+    facSection.style.display = 'block';
+    facWrap.innerHTML = facilities.map(f => `
+      <div class="fac-row">
+        <span class="fac-icon">${FACILITY_ICON[f.facility_type] || '•'}</span>
+        <span class="fac-name">${f.name || ''}</span>
+        <span class="fac-dist">${f.distance_meters ? f.distance_meters + ' م' : ''}</span>
+      </div>
+    `).join('');
+  } else {
+    facSection.style.display = 'none';
+  }
+
+  document.getElementById('listView').style.display = 'none';
+  document.getElementById('detail').style.display = 'block';
+  window.scrollTo(0,0);
+}
+
+function showList(){
+  document.getElementById('detail').style.display = 'none';
+  document.getElementById('listView').style.display = 'block';
+}
+
+loadLands();
+</script>
+</body>
+</html>
